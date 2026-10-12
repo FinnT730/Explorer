@@ -88,6 +88,13 @@ cargo run --release -- /some/dir # open a specific folder
 
 Release binaries land in `target/release/explorer`.
 
+Prebuilt binaries for Linux (x86_64, aarch64), macOS (Intel, Apple silicon) and
+Windows (x86_64) are attached to every tagged release. To cut one, push a tag:
+
+```sh
+git tag v0.1.0 && git push origin v0.1.0
+```
+
 On Linux the usual X11/Wayland client libraries must be present
 (`libxkbcommon-x11`, `libgl1`, and the X11 or Wayland runtime); Windows and macOS need
 nothing beyond the toolchain.
