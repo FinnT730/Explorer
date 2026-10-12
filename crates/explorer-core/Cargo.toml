@@ -1,0 +1,21 @@
+[package]
+name = "explorer-core"
+description = "Filesystem model, scanning, sorting and file operations for Explorer"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+chrono.workspace = true
+dirs.workspace = true
+notify.workspace = true
+open.workspace = true
+rayon.workspace = true
+serde.workspace = true
+sysinfo.workspace = true
+trash.workspace = true
+walkdir.workspace = true
+humansize.workspace = true
