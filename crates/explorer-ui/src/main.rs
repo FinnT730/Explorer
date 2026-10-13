@@ -12,12 +12,18 @@ fn main() -> eframe::Result<()> {
         }
     }
 
+    // A Mica or acrylic backdrop only shows through a transparent window, and
+    // that has to be decided before the window exists.
+    let settings = explorer_ui::settings::Settings::load();
+    let transparent = explorer_ui::backdrop::supported() && settings.backdrop.needs_transparency();
+
     let options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([1180.0, 760.0])
             .with_min_inner_size([620.0, 380.0])
             .with_title("Explorer")
-            .with_app_id("dev.explorer.Explorer"),
+            .with_app_id("dev.explorer.Explorer")
+            .with_transparent(transparent),
         ..Default::default()
     };
 

@@ -10,7 +10,7 @@ use super::{
     cell_text, draw_icon, handle_activate, handle_click, is_cut, item_menu, text_color, ViewCtx,
 };
 
-const ROW_H: f32 = 24.0;
+const ROW_H: f32 = 30.0;
 
 pub fn show(ui: &mut Ui, tab: &mut Tab, ctx: &mut ViewCtx<'_>) {
     let cols = ctx.settings.columns;
@@ -32,7 +32,7 @@ pub fn show(ui: &mut Ui, tab: &mut Tab, ctx: &mut ViewCtx<'_>) {
     }
 
     let mut builder = TableBuilder::new(ui)
-        .striped(true)
+        .striped(false)
         .resizable(true)
         .sense(Sense::click())
         .cell_layout(Layout::left_to_right(Align::Center))

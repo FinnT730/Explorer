@@ -11,7 +11,7 @@ use crate::theme::Palette;
 pub fn show(ui: &mut Ui, tab: &Tab, places: &Places, pal: &Palette, actions: &mut Vec<Action>) {
     ui.horizontal(|ui| {
         let total = tab.view.len();
-        let hidden = tab.entries.len() - total;
+        let hidden = tab.entries.len().saturating_sub(total);
         let sel = tab.selection.len();
 
         let mut left = format!("{total} item{}", plural(total));

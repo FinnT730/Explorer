@@ -55,16 +55,25 @@ pub struct App {
     toasts: Vec<Toast>,
     running: Option<Running>,
     path_edit: Option<String>,
+    path_edit_fresh: bool,
     search: String,
     focus_search: bool,
     theme_applied: Option<Theme>,
     volumes_checked: Instant,
+    /// True when the window really is translucent, so the theme can tint its
+    /// surfaces instead of painting them solid.
+    translucent: bool,
 }
 
 impl App {
     pub fn new(cc: &eframe::CreationContext<'_>, start: Option<PathBuf>) -> Self {
         let settings = Settings::load();
-        theme::apply(&cc.egui_ctx, settings.theme);
+        let dark = theme::is_dark(settings.theme, &cc.egui_ctx);
+        // The backdrop has to go on before the first frame; if the platform
+        // declines it, the theme stays opaque so nothing looks washed out.
+        let translucent = crate::backdrop::apply(cc, settings.backdrop, dark);
+        theme::install_system_font(&cc.egui_ctx);
+        theme::apply(&cc.egui_ctx, settings.theme, translucent);
 
         // Every worker wakes the UI through the same repaint callback, so
         // results show up without polling or spinning the event loop.
@@ -102,10 +111,12 @@ impl App {
             toasts: Vec::new(),
             running: None,
             path_edit: None,
+            path_edit_fresh: false,
             search: String::new(),
             focus_search: false,
             theme_applied: Some(settings.theme),
             volumes_checked: Instant::now(),
+            translucent,
             active: 0,
             tabs,
             settings,
@@ -117,7 +128,7 @@ impl App {
     }
 
     fn palette(&self, ctx: &Context) -> Palette {
-        theme::palette(theme::is_dark(self.settings.theme, ctx))
+        theme::palette(theme::is_dark(self.settings.theme, ctx), self.translucent)
     }
 
     fn tab(&self) -> &Tab {
@@ -408,7 +419,7 @@ impl App {
             }
             Action::SetTheme(t) => {
                 self.settings.theme = t;
-                theme::apply(ctx, t);
+                theme::apply(ctx, t, self.translucent);
                 self.theme_applied = Some(t);
             }
 
@@ -603,6 +614,12 @@ impl App {
                 self.places = Places::load(self.settings.pinned.clone());
             }
 
+            Action::SetBackdrop(b) => {
+                self.settings.backdrop = b;
+                self.toast("Backdrop applies the next time Explorer starts", false);
+            }
+            Action::ShowShortcuts => self.dialog = Some(Dialog::Shortcuts),
+            Action::Toast(text) => self.toast(text, false),
             Action::CloseDialog => self.dialog = None,
             Action::Confirm => self.confirm_dialog(),
             Action::Dismiss(i) => {
@@ -897,7 +914,7 @@ impl eframe::App for App {
     fn ui(&mut self, root_ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         let ctx = &root_ui.ctx().clone();
         if self.theme_applied != Some(self.settings.theme) {
-            theme::apply(ctx, self.settings.theme);
+            theme::apply(ctx, self.settings.theme, self.translucent);
             self.theme_applied = Some(self.settings.theme);
         }
         let pal = self.palette(ctx);
@@ -918,48 +935,99 @@ impl eframe::App for App {
             self.volumes_checked = Instant::now();
         }
 
+        // Re-filter and re-sort before anything draws: the status bar and the
+        // listing must not disagree about what the tab contains.
+        for tab in &mut self.tabs {
+            if tab.needs_rebuild {
+                tab.rebuild();
+            }
+        }
+
         self.keyboard(ctx);
 
-        // --- top chrome
-        egui::Panel::top("tabs").show(root_ui, |ui| {
-            let mut bars = Bars {
-                settings: &self.settings,
-                pal: &pal,
-                actions: &mut self.actions,
-                path_edit: &mut self.path_edit,
-                search: &mut self.search,
-                focus_search: self.focus_search,
-            };
-            toolbar::tab_strip(ui, &self.tabs, self.active, &mut bars);
-        });
-        egui::Panel::top("nav").show(root_ui, |ui| {
-            let tab = &self.tabs[self.active];
-            let mut bars = Bars {
-                settings: &self.settings,
-                pal: &pal,
-                actions: &mut self.actions,
-                path_edit: &mut self.path_edit,
-                search: &mut self.search,
-                focus_search: self.focus_search,
-            };
-            toolbar::nav_bar(ui, tab, &mut bars);
-            ui.add_space(2.0);
-            toolbar::view_bar(ui, tab, &mut bars);
-        });
+        // --- top chrome: tabs, command bar, address bar (the Win11 order)
+        let chrome_frame = egui::Frame::new()
+            .fill(pal.chrome)
+            .inner_margin(egui::Margin::symmetric(0, 2));
+        egui::Panel::top("tabs")
+            .frame(chrome_frame)
+            .show_separator_line(false)
+            .show(root_ui, |ui| {
+                let tabs = &self.tabs;
+                let active = self.active;
+                let mut bars = Bars {
+                    settings: &self.settings,
+                    pal: &pal,
+                    actions: &mut self.actions,
+                    path_edit: &mut self.path_edit,
+                    path_edit_fresh: &mut self.path_edit_fresh,
+                    search: &mut self.search,
+                    focus_search: self.focus_search,
+                };
+                toolbar::tab_strip(ui, tabs, active, &mut bars);
+            });
+        egui::Panel::top("commands")
+            .frame(chrome_frame)
+            .show_separator_line(false)
+            .show(root_ui, |ui| {
+                let tab = &self.tabs[self.active];
+                let mut bars = Bars {
+                    settings: &self.settings,
+                    pal: &pal,
+                    actions: &mut self.actions,
+                    path_edit: &mut self.path_edit,
+                    path_edit_fresh: &mut self.path_edit_fresh,
+                    search: &mut self.search,
+                    focus_search: self.focus_search,
+                };
+                toolbar::command_bar(ui, tab, &mut bars);
+            });
+        egui::Panel::top("address")
+            .frame(
+                egui::Frame::new()
+                    .fill(pal.chrome)
+                    .inner_margin(egui::Margin {
+                        left: 0,
+                        right: 0,
+                        top: 2,
+                        bottom: 6,
+                    }),
+            )
+            .show_separator_line(false)
+            .show(root_ui, |ui| {
+                let tab = &self.tabs[self.active];
+                let mut bars = Bars {
+                    settings: &self.settings,
+                    pal: &pal,
+                    actions: &mut self.actions,
+                    path_edit: &mut self.path_edit,
+                    path_edit_fresh: &mut self.path_edit_fresh,
+                    search: &mut self.search,
+                    focus_search: self.focus_search,
+                };
+                toolbar::address_bar(ui, tab, &mut bars);
+            });
         self.focus_search = false;
 
         // --- bottom chrome
         if self.settings.show_status_bar {
-            egui::Panel::bottom("status").show(root_ui, |ui| {
-                self.draw_progress(ui);
-                statusbar::show(
-                    ui,
-                    &self.tabs[self.active],
-                    &self.places,
-                    &pal,
-                    &mut self.actions,
-                );
-            });
+            egui::Panel::bottom("status")
+                .frame(
+                    egui::Frame::new()
+                        .fill(pal.surface)
+                        .inner_margin(egui::Margin::symmetric(10, 3)),
+                )
+                .show_separator_line(false)
+                .show(root_ui, |ui| {
+                    self.draw_progress(ui);
+                    statusbar::show(
+                        ui,
+                        &self.tabs[self.active],
+                        &self.places,
+                        &pal,
+                        &mut self.actions,
+                    );
+                });
         }
 
         // --- side panels
@@ -969,6 +1037,12 @@ impl eframe::App for App {
                 .resizable(true)
                 .default_size(width)
                 .size_range(140.0..=420.0)
+                .frame(
+                    egui::Frame::new()
+                        .fill(pal.surface)
+                        .inner_margin(egui::Margin::symmetric(6, 4)),
+                )
+                .show_separator_line(false)
                 .show(root_ui, |ui| {
                     width = ui.available_width();
                     let current = self.tabs[self.active].path().to_path_buf();
@@ -999,6 +1073,11 @@ impl eframe::App for App {
                 .resizable(true)
                 .default_size(width)
                 .size_range(180.0..=560.0)
+                .frame(
+                    egui::Frame::new()
+                        .fill(pal.surface)
+                        .inner_margin(egui::Margin::symmetric(10, 6)),
+                )
                 .show(root_ui, |ui| {
                     width = ui.available_width();
                     let mut view_ctx = ViewCtx {
@@ -1015,21 +1094,24 @@ impl eframe::App for App {
         }
 
         // --- listing
-        egui::CentralPanel::default().show(root_ui, |ui| {
-            let tab = &mut self.tabs[self.active];
-            if tab.needs_rebuild {
-                tab.rebuild();
-            }
-            let mut view_ctx = ViewCtx {
-                settings: &self.settings,
-                pal: &pal,
-                thumbs: &self.thumbs,
-                textures: &mut self.textures,
-                clipboard: &self.clipboard,
-                actions: &mut self.actions,
-            };
-            views::show(ui, tab, &mut view_ctx);
-        });
+        egui::CentralPanel::default()
+            .frame(
+                egui::Frame::new()
+                    .fill(pal.surface)
+                    .inner_margin(egui::Margin::symmetric(6, 2)),
+            )
+            .show(root_ui, |ui| {
+                let tab = &mut self.tabs[self.active];
+                let mut view_ctx = ViewCtx {
+                    settings: &self.settings,
+                    pal: &pal,
+                    thumbs: &self.thumbs,
+                    textures: &mut self.textures,
+                    clipboard: &self.clipboard,
+                    actions: &mut self.actions,
+                };
+                views::show(ui, tab, &mut view_ctx);
+            });
 
         // --- overlays
         if let Some(mut dialog) = self.dialog.take() {
@@ -1074,6 +1156,16 @@ impl eframe::App for App {
 
         let title = format!("{} — Explorer", self.tabs[self.active].title());
         ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
+    }
+
+    /// With a backdrop the window must be cleared to nothing, so Mica or the
+    /// desktop shows through; otherwise clear to the chrome colour.
+    fn clear_color(&self, visuals: &egui::Visuals) -> [f32; 4] {
+        if self.translucent {
+            [0.0, 0.0, 0.0, 0.0]
+        } else {
+            visuals.panel_fill.to_normalized_gamma_f32()
+        }
     }
 
     fn save(&mut self, _storage: &mut dyn eframe::Storage) {

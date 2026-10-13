@@ -8,7 +8,7 @@ use std::path::PathBuf;
 
 use explorer_core::{SortKey, Volume};
 
-use crate::settings::{Theme, ViewMode};
+use crate::settings::{Backdrop, Theme, ViewMode};
 
 #[derive(Clone, Debug)]
 pub enum Action {
@@ -38,6 +38,7 @@ pub enum Action {
     ToggleStatusBar,
     ToggleColumn(Column),
     SetTheme(Theme),
+    SetBackdrop(Backdrop),
 
     // Selection
     SelectAll,
@@ -85,6 +86,8 @@ pub enum Action {
     RefreshVolumes,
 
     // Dialogs
+    ShowShortcuts,
+    Toast(String),
     CloseDialog,
     Confirm,
     Dismiss(usize),

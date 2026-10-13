@@ -81,7 +81,9 @@ pub fn show(ui: &mut Ui, tab: &mut Tab, ctx: &mut ViewCtx<'_>) {
     }
 }
 
-/// Paint the selection/hover backdrop for one item.
+/// Paint the selection/hover backdrop for one item, Fluent-style: a rounded
+/// accent-tinted fill for selection, a faint fill on hover, and an accent bar
+/// on the left edge of the selected row.
 pub fn paint_row_background(
     ui: &Ui,
     rect: Rect,
@@ -91,30 +93,33 @@ pub fn paint_row_background(
     pal: &Palette,
 ) {
     let painter = ui.painter();
+    let radius = CornerRadius::same(crate::theme::RADIUS_SMALL);
     if selected {
-        painter.rect_filled(rect, CornerRadius::same(4), pal.selection);
-    } else if hovered {
-        painter.rect_filled(
-            rect,
-            CornerRadius::same(4),
-            ui.visuals().widgets.hovered.weak_bg_fill,
+        painter.rect_filled(rect, radius, pal.selection);
+        let bar = Rect::from_min_size(
+            rect.min + egui::vec2(0.0, rect.height() * 0.22),
+            egui::vec2(3.0, rect.height() * 0.56),
         );
+        painter.rect_filled(bar, CornerRadius::same(2), pal.accent);
+    } else if hovered {
+        painter.rect_filled(rect, radius, pal.hover);
     }
-    if cursored {
+    if cursored && !selected {
         painter.rect_stroke(
             rect,
-            CornerRadius::same(4),
-            Stroke::new(1.0, pal.accent),
+            radius,
+            Stroke::new(1.0, pal.accent.gamma_multiply(0.7)),
             StrokeKind::Inside,
         );
     }
 }
 
-pub fn text_color(selected: bool, pal: &Palette, ui: &Ui) -> Color32 {
+pub fn text_color(selected: bool, pal: &Palette, _ui: &Ui) -> Color32 {
+    // Fluent keeps the text colour constant and tints the row instead.
     if selected {
         pal.selection_text
     } else {
-        ui.visuals().text_color()
+        pal.text
     }
 }
 

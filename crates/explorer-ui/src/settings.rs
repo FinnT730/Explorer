@@ -35,6 +35,53 @@ impl ViewMode {
     }
 }
 
+/// Window background effect. Mica and acrylic are Windows 11 features; on
+/// macOS they map to the closest vibrancy material, and elsewhere the window
+/// stays opaque.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
+pub enum Backdrop {
+    /// Opaque window.
+    None,
+    /// Mica: the desktop wallpaper, blurred and tinted. Win11 22000+.
+    Mica,
+    /// Mica Alt, the "tabbed" variant Explorer itself uses. Win11 22523+.
+    Tabbed,
+    /// Acrylic: blurs whatever is behind the window.
+    Acrylic,
+}
+
+impl Backdrop {
+    pub const ALL: [Backdrop; 4] = [
+        Backdrop::None,
+        Backdrop::Mica,
+        Backdrop::Tabbed,
+        Backdrop::Acrylic,
+    ];
+
+    pub fn label(self) -> &'static str {
+        match self {
+            Backdrop::None => "None (opaque)",
+            Backdrop::Mica => "Mica",
+            Backdrop::Tabbed => "Mica Alt",
+            Backdrop::Acrylic => "Acrylic",
+        }
+    }
+
+    /// Whether the window must be created transparent for this to show.
+    pub fn needs_transparency(self) -> bool {
+        self != Backdrop::None
+    }
+
+    /// The default: Explorer's own look on Windows 11, opaque elsewhere.
+    pub fn platform_default() -> Self {
+        if cfg!(windows) {
+            Backdrop::Tabbed
+        } else {
+            Backdrop::None
+        }
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug, Serialize, Deserialize)]
 pub enum Theme {
     Dark,
@@ -46,6 +93,7 @@ pub enum Theme {
 #[serde(default)]
 pub struct Settings {
     pub theme: Theme,
+    pub backdrop: Backdrop,
     pub view_mode: ViewMode,
     pub icon_size: f32,
     pub show_hidden: bool,
@@ -94,6 +142,7 @@ impl Default for Settings {
     fn default() -> Self {
         Self {
             theme: Theme::Dark,
+            backdrop: Backdrop::platform_default(),
             view_mode: ViewMode::Details,
             icon_size: 96.0,
             show_hidden: false,

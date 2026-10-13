@@ -323,3 +323,198 @@ pub enum ViewGlyph {
     Icons,
     Tiles,
 }
+
+/// Command-bar pictograms, drawn as 16 px line art in the Fluent manner:
+/// 1.3 px strokes, square-ish shapes, no fills except where Fluent fills.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Cmd {
+    New,
+    Cut,
+    Copy,
+    Paste,
+    Rename,
+    Delete,
+    Sort,
+    Grid,
+    PreviewPane,
+    NavPane,
+    Search,
+    Terminal,
+    Info,
+    More,
+    Close,
+    Plus,
+}
+
+pub fn cmd(painter: &Painter, rect: Rect, kind: Cmd, color: Color32) {
+    let r = Rect::from_center_size(rect.center(), Vec2::splat(rect.height().min(rect.width())))
+        .shrink(rect.height() * 0.22);
+    let s = Stroke::new(1.3, color);
+    let line = |a: Pos2, b: Pos2| painter.line_segment([a, b], s);
+    let frame =
+        |rr: Rect, rad: u8| painter.rect_stroke(rr, CornerRadius::same(rad), s, StrokeKind::Inside);
+    let (l, t, right, b) = (r.left(), r.top(), r.right(), r.bottom());
+    let (w, h) = (r.width(), r.height());
+
+    match kind {
+        Cmd::New | Cmd::Plus => {
+            line(Pos2::new(r.center().x, t), Pos2::new(r.center().x, b));
+            line(Pos2::new(l, r.center().y), Pos2::new(right, r.center().y));
+        }
+        Cmd::Close => {
+            line(r.left_top(), r.right_bottom());
+            line(r.right_top(), r.left_bottom());
+        }
+        Cmd::Cut => {
+            line(
+                Pos2::new(l + w * 0.2, t),
+                Pos2::new(right - w * 0.2, b - h * 0.25),
+            );
+            line(
+                Pos2::new(right - w * 0.2, t),
+                Pos2::new(l + w * 0.2, b - h * 0.25),
+            );
+            painter.circle_stroke(Pos2::new(l + w * 0.22, b - h * 0.12), w * 0.14, s);
+            painter.circle_stroke(Pos2::new(right - w * 0.22, b - h * 0.12), w * 0.14, s);
+        }
+        Cmd::Copy => {
+            frame(
+                Rect::from_min_size(Pos2::new(l, t), Vec2::new(w * 0.68, h * 0.68)),
+                2,
+            );
+            frame(
+                Rect::from_min_size(
+                    Pos2::new(l + w * 0.32, t + h * 0.32),
+                    Vec2::new(w * 0.68, h * 0.68),
+                ),
+                2,
+            );
+        }
+        Cmd::Paste => {
+            frame(
+                Rect::from_min_size(
+                    Pos2::new(l + w * 0.1, t + h * 0.12),
+                    Vec2::new(w * 0.8, h * 0.88),
+                ),
+                2,
+            );
+            painter.rect_filled(
+                Rect::from_min_size(Pos2::new(l + w * 0.3, t), Vec2::new(w * 0.4, h * 0.2)),
+                CornerRadius::same(1),
+                color,
+            );
+        }
+        Cmd::Rename => {
+            // A pencil lying on a baseline: two parallel edges, a tip, a nib.
+            let tip = Pos2::new(l + w * 0.08, b - h * 0.22);
+            let tail_a = Pos2::new(right - w * 0.3, t);
+            let tail_b = Pos2::new(right, t + h * 0.3);
+            line(tip, tail_a);
+            line(tip, tail_b);
+            line(tail_a, tail_b);
+            line(
+                Pos2::new(l + w * 0.22, b - h * 0.52),
+                Pos2::new(l + w * 0.52, b - h * 0.22),
+            );
+            line(Pos2::new(l, b), Pos2::new(right, b));
+        }
+        Cmd::Delete => {
+            // Lid, handle, then a slightly tapered can with two ribs.
+            line(Pos2::new(l, t + h * 0.2), Pos2::new(right, t + h * 0.2));
+            line(
+                Pos2::new(l + w * 0.34, t + h * 0.2),
+                Pos2::new(l + w * 0.34, t + h * 0.06),
+            );
+            line(
+                Pos2::new(l + w * 0.34, t + h * 0.06),
+                Pos2::new(right - w * 0.34, t + h * 0.06),
+            );
+            line(
+                Pos2::new(right - w * 0.34, t + h * 0.06),
+                Pos2::new(right - w * 0.34, t + h * 0.2),
+            );
+            line(
+                Pos2::new(l + w * 0.14, t + h * 0.2),
+                Pos2::new(l + w * 0.22, b),
+            );
+            line(
+                Pos2::new(right - w * 0.14, t + h * 0.2),
+                Pos2::new(right - w * 0.22, b),
+            );
+            line(Pos2::new(l + w * 0.22, b), Pos2::new(right - w * 0.22, b));
+            for frac in [0.38f32, 0.62] {
+                line(
+                    Pos2::new(l + w * frac, t + h * 0.36),
+                    Pos2::new(l + w * frac, b - h * 0.14),
+                );
+            }
+        }
+        Cmd::Sort => {
+            for (i, frac) in [0.15f32, 0.45, 0.75].iter().enumerate() {
+                let y = t + h * frac;
+                let len = w * (0.95 - i as f32 * 0.25);
+                line(Pos2::new(l, y), Pos2::new(l + len, y));
+            }
+        }
+        Cmd::Grid => {
+            let c = w * 0.44;
+            for (dx, dy) in [(0.0, 0.0), (0.56, 0.0), (0.0, 0.56), (0.56, 0.56)] {
+                painter.rect_filled(
+                    Rect::from_min_size(Pos2::new(l + w * dx, t + h * dy), Vec2::splat(c)),
+                    CornerRadius::same(1),
+                    color,
+                );
+            }
+        }
+        Cmd::PreviewPane => {
+            frame(r, 2);
+            line(Pos2::new(l + w * 0.6, t), Pos2::new(l + w * 0.6, b));
+            painter.rect_filled(
+                Rect::from_min_max(Pos2::new(l + w * 0.6, t), r.right_bottom()),
+                CornerRadius::same(1),
+                color.gamma_multiply(0.35),
+            );
+        }
+        Cmd::NavPane => {
+            frame(r, 2);
+            line(Pos2::new(l + w * 0.4, t), Pos2::new(l + w * 0.4, b));
+            painter.rect_filled(
+                Rect::from_min_max(r.left_top(), Pos2::new(l + w * 0.4, b)),
+                CornerRadius::same(1),
+                color.gamma_multiply(0.35),
+            );
+        }
+        Cmd::Search => {
+            painter.circle_stroke(Pos2::new(l + w * 0.42, t + h * 0.42), w * 0.34, s);
+            line(Pos2::new(l + w * 0.68, t + h * 0.68), Pos2::new(right, b));
+        }
+        Cmd::Terminal => {
+            frame(r, 2);
+            line(
+                Pos2::new(l + w * 0.22, t + h * 0.3),
+                Pos2::new(l + w * 0.45, r.center().y),
+            );
+            line(
+                Pos2::new(l + w * 0.45, r.center().y),
+                Pos2::new(l + w * 0.22, b - h * 0.3),
+            );
+            line(
+                Pos2::new(l + w * 0.55, b - h * 0.3),
+                Pos2::new(right - w * 0.15, b - h * 0.3),
+            );
+        }
+        Cmd::Info => {
+            painter.circle_stroke(r.center(), w * 0.48, s);
+            line(
+                Pos2::new(r.center().x, t + h * 0.42),
+                Pos2::new(r.center().x, b - h * 0.18),
+            );
+            painter.circle_filled(Pos2::new(r.center().x, t + h * 0.22), 1.0, color);
+        }
+        Cmd::More => {
+            for frac in [0.2f32, 0.5, 0.8] {
+                painter.circle_filled(Pos2::new(l + w * frac, r.center().y), 1.4, color);
+            }
+        }
+    }
+}

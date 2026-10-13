@@ -15,8 +15,11 @@ scale factor.
 **Browsing**
 - Tabs, with middle-click close, duplicate, and `Ctrl+T` / `Ctrl+W`
 - Back / forward / up with full per-tab history
-- Clickable breadcrumbs; right-click a crumb for its subfolders; click the empty strip
-  (or `Ctrl+L`) to type a path, with `~` expansion
+- An Explorer-style address bar: clickable breadcrumbs, a chevron between each pair
+  that lists that folder's children, and a leading `…` menu once the path outgrows the
+  bar. Click the empty part of it (or press `Ctrl+L`) to edit the path as text with the
+  whole thing pre-selected; Enter navigates, Escape goes back to crumbs. Right-click it
+  for *Copy address*, *Edit address*, *Open in new tab* and *Open in terminal*
 - Navigation pane: quick access folders, pinned folders, mounted volumes with
   used-space bars, and a lazy folder tree
 - Live refresh: the directory is watched and re-scanned when it changes, debounced
@@ -51,6 +54,17 @@ scale factor.
 - Press Enter to search subfolders recursively, with results streaming in
 - `*` and `?` wildcards, so `*.rs` works
 - Type-ahead: start typing in the listing to jump to a name
+
+**Looks**
+- Laid out like Windows 11's File Explorer: tab strip, command bar, then the address
+  row, with a navigation pane, preview pane and status bar around the listing
+- Fluent styling throughout — 4 px rounded highlights, an accent-tinted selection with
+  an accent bar, flat icon buttons and drop-down command menus
+- **Mica** and **Acrylic** window backdrops on Windows 11 (Mica Alt is the default
+  there, the same material Explorer itself uses), and the matching vibrancy materials
+  on macOS. Pick one under ⋯ → Appearance → Window backdrop; it applies at the next
+  start, and falls back to an opaque window wherever the platform declines it
+- Uses the platform UI font (Segoe UI Variable on Windows, SF on macOS) when present
 
 **Fit and finish**
 - Dark, light or follow-the-system theme
@@ -127,6 +141,9 @@ one place and the views free of application state.
   thumbnail size
 - Platform shell integration: no Windows jump lists, no OS-level file associations
   editing, no shell extension menus
+- The Mica/Acrylic path is written against `window-vibrancy` and type-checks for
+  Windows and macOS, but it has only been run on Linux so far, where backdrops do not
+  apply
 
 ## License
 

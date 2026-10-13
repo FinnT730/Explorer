@@ -2,6 +2,7 @@
 
 pub mod action;
 pub mod app;
+pub mod backdrop;
 pub mod dialogs;
 pub mod icons;
 pub mod preview;
